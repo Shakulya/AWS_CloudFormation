@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: 2010-09-09
+# This CloudFormation template deploys a basic VPC, 2 Public Subnets, Internet Gateway and associates it with subnets. 
+Resources:
+  # Creates a VPC 
+  TaskVPC:   
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      Tags:
+      - Key: "Team"
+        Value: "Infra"
+      - Key: "Env"
+        Value: "Test"
+      - Key: "Name"
+        Value: "SecondVPC"
+  # Creates 2 Public Subnets
+  TaskSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:   
+      CidrBlock: 10.0.1.0/24
+      VpcId: 
+        Ref: TaskVPC
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: "Team"
+        Value: "Infra"
+      - Key: "Env"
+        Value: "Test"
+  TaskSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:   
+      CidrBlock: 10.0.2.0/24
+      VpcId:
+        Ref: TaskVPC
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: "Team"
+        Value: "Infra"
+      - Key: "Env"
+        Value: "Test"      
+  # Creates an Internet Gateway
+  TaskInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    DependsOn: TaskVPC
+    Properties: 
+      Tags: 
+      - Key: "Team"
+        Value: "Infra"
+      - Key: "Env"
+        Value: "Test"
+  # Attaches the Gateway to the VPC
+  TaskVPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    DependsOn: TaskInternetGateway 
+    Properties:
+      VpcId: 
+        Ref: TaskVPC
+      InternetGatewayId: 
+        Ref: TaskInternetGateway
+  # Creates a Route Table
+  TaskRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: 
+        Ref: TaskVPC
+      Tags: 
+      - Key: "Team"
+        Value: "Infra"
+      - Key: "Env"
+        Value: "Test"
+  TaskInternetRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: 
+        Ref: TaskInternetGateway
+      RouteTableId: 
+        Ref: TaskRouteTable
+    DependsOn: TaskVPCGatewayAttachment
+  # Creates Route Table Subnet Association
+  SubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: 
+        Ref: TaskRouteTable
+      SubnetId: 
+        Ref: TaskSubnetA
+  SubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: 
+        Ref: TaskRouteTable
+      SubnetId: 
+        Ref: TaskSubnetB
