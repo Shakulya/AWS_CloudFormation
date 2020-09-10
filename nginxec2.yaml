@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: 2010-09-09
+# AWS CloudFormation template deploys an EC2 instance, attached Security Group with the SSH & HTTP ports allowed & parameterized values.
+# Define parameters:
+Parameters:
+  InstanceType:
+    Description: EC2 Instance Type
+    Type: String
+    Default: t2.micro
+  InstanceAMI:
+    Description: EC2 Instance AMI ID
+    Type: String
+    Default:                   # Provide your AMI ID
+  InstanceSubnet:
+    Description: Subnet CIDR block
+    Type: String
+    Default:                   # Provide your Subnet ID
+  InstanceVolumeSize:
+    Description: EBS volume size
+    Type: String
+    Default: "8"
+  SSHConCIDR:
+    Description: IP address/CIDR Block to allow SSH connection to the EC2 Instance only from it
+    Type: String
+    Default: 0.0.0.0/0
+  InstanceName:
+    Description: EC2 Instance Name
+    Type: String
+    Default: WebInstance
+  SGName:
+    Description: Security Group Name
+    Type: String
+    Default: WebInstanceSG
+  VPCId:
+    Description: VPC ID for SG creation
+    Type: String
+    Default:                     # Provide your VPC ID
+  EnvTag:
+    Description: Environment Tag
+    Type: String
+    Default: "Dev"
+    AllowedValues:
+      - Dev
+      - Stage
+      - Prod
+  TeamTag:
+    Description: Team Tag
+    Type: String
+    Default: "DevOps"
+# Security Group Port Numbers:
+  SSHPort:
+    Type: Number
+    Default: 22
+  HTTPPort:
+    Type: Number
+    Default: 80
+Resources:
+# Security Group to be attached to the EC2 Instance
+  InstanceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Open SSH and HTTP ports/traffic to the Webserver Instance"
+      GroupName: !Ref SGName
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - Description: Allows SSH connection to the instance only from my work CIDR
+          CidrIp: !Ref SSHConCIDR
+          IpProtocol: tcp
+          FromPort: !Ref SSHPort
+          ToPort: !Ref SSHPort
+        - Description: Allows inbound HTTP web traffic to the instance
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: !Ref HTTPPort
+          ToPort: !Ref HTTPPort
+# EC2 Linux Instance with the User Data defined for NGINX installation on boot.
+  LinuxInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: InstanceSG
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref InstanceAMI
+      SubnetId: !Ref InstanceSubnet
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: !Ref InstanceVolumeSize
+            DeleteOnTermination: "true"
+            Encrypted: "false"
+      SecurityGroupIds:
+      - !Ref InstanceSG
+      KeyName:                      # Provide your Key
+      Tags:
+      - Key: "Name"
+        Value: !Ref InstanceName
+      - Key: "Team"
+        Value: !Ref TeamTag
+      - Key: "Environment"
+        Value: !Ref EnvTag
+      UserData:
+        Fn::Base64: !Sub |
+           #!/bin/bash
+           sudo yum update -y
+           sudo yum install nginx -y
+           sudo service nginx start
+           sudo chkconfig nginx enable
+Outputs:
+  EC2PublicIP:
+    Description: Public IP address of the newly created EC2 instance
+    Value:
+      'Fn::GetAtt':
+        - LinuxInstance
+        - PublicIp
+  SecurityGroupID:
+    Description: Security Group ID
+    Value:
+      'Fn::GetAtt':
+        - InstanceSG
+        - GroupId
